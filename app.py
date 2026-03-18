@@ -25,11 +25,9 @@ def health_check():
 def create_parcel():
     data = request.get_json()
     
-    # Input Validation
     if not data or 'customer_email' not in data or 'destination' not in data:
         return jsonify({"error": "Missing customer_email or destination"}), 400
         
-    # Generate unique tracking ID
     parcel_id = "PKG-" + str(uuid.uuid4())[:8].upper()
     
     item = {
@@ -43,6 +41,15 @@ def create_parcel():
     try:
         table.put_item(Item=item)
         return jsonify({"message": "Parcel created successfully", "parcel": item}), 201
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/parcels', methods=['GET'])
+def get_all_parcels():
+    try:
+        # Scan the table to get all parcels
+        response = table.scan()
+        return jsonify({"parcels": response.get('Items', [])}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
