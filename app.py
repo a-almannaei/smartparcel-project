@@ -47,9 +47,19 @@ def create_parcel():
 @app.route('/api/parcels', methods=['GET'])
 def get_all_parcels():
     try:
-        # Scan the table to get all parcels
         response = table.scan()
         return jsonify({"parcels": response.get('Items', [])}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/parcels/<parcel_id>', methods=['GET'])
+def get_parcel(parcel_id):
+    try:
+        response = table.get_item(Key={'parcel_id': parcel_id})
+        if 'Item' in response:
+            return jsonify({"parcel": response['Item']}), 200
+        else:
+            return jsonify({"error": "Parcel not found"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
