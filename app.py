@@ -63,5 +63,26 @@ def get_parcel(parcel_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/parcels/<parcel_id>/status', methods=['PUT'])
+def update_status(parcel_id):
+    data = request.get_json()
+    
+    if not data or 'status' not in data:
+        return jsonify({"error": "Missing new status"}), 400
+        
+    new_status = data['status'].lower()
+    
+    try:
+        response = table.update_item(
+            Key={'parcel_id': parcel_id},
+            UpdateExpression="set #s = :stat",
+            ExpressionAttributeNames={'#s': 'status'},
+            ExpressionAttributeValues={':stat': new_status},
+            ReturnValues="UPDATED_NEW"
+        )
+        return jsonify({"message": "Status updated successfully", "updated_status": response['Attributes']['status']}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
