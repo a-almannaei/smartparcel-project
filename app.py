@@ -84,5 +84,18 @@ def update_status(parcel_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/parcels/<parcel_id>', methods=['DELETE'])
+def delete_parcel(parcel_id):
+    try:
+        # Check if parcel exists first
+        response = table.get_item(Key={'parcel_id': parcel_id})
+        if 'Item' not in response:
+            return jsonify({"error": "Parcel not found"}), 404
+            
+        table.delete_item(Key={'parcel_id': parcel_id})
+        return jsonify({"message": f"Parcel {parcel_id} deleted successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
