@@ -9,13 +9,18 @@
 from flask import Flask, request, jsonify
 import boto3
 import uuid
+import json
 from datetime import datetime
 
 app = Flask(__name__)
 
-# Initialize DynamoDB Connection (Target Region: Sydney)
+# Initialize AWS Connections (Target Region: Sydney)
 dynamodb = boto3.resource('dynamodb', region_name='ap-southeast-2')
 table = dynamodb.Table('smartparcel-parcels')
+
+sqs = boto3.client('sqs', region_name='ap-southeast-2')
+# Your exact SQS Queue URL
+SQS_QUEUE_URL = 'https://sqs.ap-southeast-2.amazonaws.com/978355780049/smartparcel-notifications-20220002297'
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -73,21 +78,39 @@ def update_status(parcel_id):
     new_status = data['status'].lower()
     
     try:
+        # Update DynamoDB and get the whole updated item back
         response = table.update_item(
             Key={'parcel_id': parcel_id},
             UpdateExpression="set #s = :stat",
             ExpressionAttributeNames={'#s': 'status'},
             ExpressionAttributeValues={':stat': new_status},
-            ReturnValues="UPDATED_NEW"
+            ReturnValues="ALL_NEW"
         )
-        return jsonify({"message": "Status updated successfully", "updated_status": response['Attributes']['status']}), 200
+        updated_item = response['Attributes']
+        
+        # Send async notification message to SQS
+        message_body = {
+            'parcel_id': parcel_id,
+            'new_status': new_status,
+            'customer_email': updated_item.get('customer_email', 'unknown')
+        }
+        
+        sqs.send_message(
+            QueueUrl=SQS_QUEUE_URL,
+            MessageBody=json.dumps(message_body)
+        )
+        
+        return jsonify({
+            "message": "Status updated & notification queued", 
+            "updated_status": new_status
+        }), 200
+        
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/parcels/<parcel_id>', methods=['DELETE'])
 def delete_parcel(parcel_id):
     try:
-        # Check if parcel exists first
         response = table.get_item(Key={'parcel_id': parcel_id})
         if 'Item' not in response:
             return jsonify({"error": "Parcel not found"}), 404
